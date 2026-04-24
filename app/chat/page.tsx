@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Home, Brain, ChevronDown, ChevronRight, BookMarked, Layers } from 'lucide-react';
+import { Send, Home, Brain, ChevronDown, ChevronRight, BookMarked, Layers, Mic } from 'lucide-react';
 import MessageContent from '@/components/artifacts/MessageContent';
 import ArtifactsPanel from '@/components/artifacts/ArtifactsPanel';
 import { useArtifactsStore } from '@/lib/artifacts-store';
+import VoiceOverlay, { VoiceTurn } from '@/components/voice/VoiceOverlay';
 
 type Msg = {
   role: 'user' | 'assistant';
@@ -18,6 +19,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const router = useRouter();
   const bottomRef = useRef<HTMLDivElement>(null);
   const panelOpen = useArtifactsStore((s) => s.panelOpen);
@@ -110,6 +112,14 @@ export default function Chat() {
     });
   };
 
+  const onVoiceTurn = (turn: VoiceTurn) => {
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: turn.user },
+      { role: 'assistant', content: turn.assistant, reasoning: turn.reasoning, reasoningOpen: false },
+    ]);
+  };
+
   return (
     <main className="min-h-screen flex flex-col">
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -138,6 +148,17 @@ export default function Chat() {
           >
             <BookMarked className="h-4 w-4" />
             <span className="hidden sm:inline">Mémoire</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setVoiceOpen(true)}
+            disabled={streaming}
+            aria-label="Mode vocal"
+            title="Mode vocal"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 rounded-md px-2 py-1 hover:bg-secondary/60 transition-colors"
+          >
+            <Mic className="h-4 w-4" />
+            <span className="hidden sm:inline">Voix</span>
           </button>
           <button onClick={() => router.push('/settings')} className="text-sm text-muted-foreground hover:text-foreground">Settings</button>
         </div>
@@ -203,6 +224,13 @@ export default function Chat() {
           </section>
         )}
       </div>
+      <VoiceOverlay
+        open={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        history={messages.map((m) => ({ role: m.role, content: m.content }))}
+        backend={getBackend()}
+        onTurn={onVoiceTurn}
+      />
     </main>
   );
 }
