@@ -2,9 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Home } from 'lucide-react';
+import { Send, Home, Brain, ChevronDown, ChevronRight } from 'lucide-react';
 
-type Msg = { role: 'user' | 'assistant'; content: string };
+type Msg = {
+  role: 'user' | 'assistant';
+  content: string;
+  reasoning?: string;
+  reasoningOpen?: boolean;
+};
 
 export default function Chat() {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -31,7 +36,7 @@ export default function Chat() {
     setInput('');
     setStreaming(true);
     const assistantIdx = next.length;
-    setMessages([...next, { role: 'assistant', content: '' }]);
+    setMessages([...next, { role: 'assistant', content: '', reasoning: '', reasoningOpen: false }]);
     try {
       const res = await fetch(`${getBackend()}/chat/completions`, {
         method: 'POST',
@@ -40,8 +45,12 @@ export default function Chat() {
           model: 'chimere',
           messages: next.map((m) => ({ role: m.role, content: m.content })),
           stream: true,
+          max_tokens: 16384,
         }),
       });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let buf = '';
@@ -57,11 +66,19 @@ export default function Chat() {
           if (payload === '[DONE]') continue;
           try {
             const chunk = JSON.parse(payload);
-            const delta = chunk.choices?.[0]?.delta?.content || '';
-            if (delta) {
+            const delta = chunk.choices?.[0]?.delta;
+            if (!delta) continue;
+            const contentDelta: string = delta.content || '';
+            const reasoningDelta: string = delta.reasoning_content || '';
+            if (contentDelta || reasoningDelta) {
               setMessages((prev) => {
                 const copy = [...prev];
-                copy[assistantIdx] = { ...copy[assistantIdx], content: copy[assistantIdx].content + delta };
+                const cur = copy[assistantIdx];
+                copy[assistantIdx] = {
+                  ...cur,
+                  content: cur.content + contentDelta,
+                  reasoning: (cur.reasoning || '') + reasoningDelta,
+                };
                 return copy;
               });
             }
@@ -71,13 +88,21 @@ export default function Chat() {
     } catch (err) {
       setMessages((prev) => {
         const copy = [...prev];
-        copy[assistantIdx] = { role: 'assistant', content: `[erreur backend ${getBackend()}]` };
+        copy[assistantIdx] = { role: 'assistant', content: `[erreur backend ${getBackend()}] ${String(err)}` };
         return copy;
       });
     } finally {
       setStreaming(false);
     }
   }
+
+  const toggleReasoning = (i: number) => {
+    setMessages((prev) => {
+      const copy = [...prev];
+      copy[i] = { ...copy[i], reasoningOpen: !copy[i].reasoningOpen };
+      return copy;
+    });
+  };
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -89,13 +114,33 @@ export default function Chat() {
       </header>
       <div className="flex-1 overflow-y-auto px-6 py-8">
         <div className="max-w-3xl mx-auto space-y-6">
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex'}>
-              <div className={`rounded-lg px-4 py-2.5 max-w-[85%] whitespace-pre-wrap ${m.role === 'user' ? 'bg-secondary' : 'bg-transparent'}`}>
-                {m.content || (streaming && i === messages.length - 1 ? '…' : '')}
+          {messages.map((m, i) => {
+            const isAssistant = m.role === 'assistant';
+            const hasReasoning = isAssistant && m.reasoning && m.reasoning.length > 0;
+            const thinking = isAssistant && streaming && i === messages.length - 1 && !m.content && hasReasoning;
+            return (
+              <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex flex-col items-start'}>
+                {hasReasoning && (
+                  <button
+                    onClick={() => toggleReasoning(i)}
+                    className="mb-2 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {m.reasoningOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                    <Brain className="h-3.5 w-3.5" />
+                    {thinking ? 'Raisonne…' : 'Raisonnement'}
+                  </button>
+                )}
+                {hasReasoning && m.reasoningOpen && (
+                  <div className="mb-2 rounded-md bg-secondary/30 border border-border/50 px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap max-w-[85%]">
+                    {m.reasoning}
+                  </div>
+                )}
+                <div className={`rounded-lg px-4 py-2.5 max-w-[85%] whitespace-pre-wrap ${m.role === 'user' ? 'bg-secondary' : 'bg-transparent'}`}>
+                  {m.content || (thinking ? '…' : (streaming && i === messages.length - 1 ? '…' : ''))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={bottomRef} />
         </div>
       </div>

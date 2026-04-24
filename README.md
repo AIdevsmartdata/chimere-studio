@@ -14,6 +14,16 @@ Connects to any OpenAI-compatible backend. Default: local ODO (`http://127.0.0.1
 
 ## Quick start
 
+Linux — system deps (Ubuntu 24.04+) :
+
+```bash
+sudo apt install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
+  libglib2.0-dev libgdk-pixbuf2.0-dev libpango1.0-dev libsoup-3.0-dev \
+  libjavascriptcoregtk-4.1-dev libayatana-appindicator3-dev build-essential
+```
+
+Puis :
+
 ```bash
 pnpm install
 pnpm tauri dev       # dev with hot reload
