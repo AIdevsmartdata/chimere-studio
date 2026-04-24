@@ -6,14 +6,17 @@ import { ArrowLeft } from 'lucide-react';
 
 export default function Settings() {
   const [backend, setBackend] = useState('');
+  const [mcp, setMcp] = useState('');
   const router = useRouter();
 
   useEffect(() => {
     setBackend(localStorage.getItem('chimere:backend') || 'http://127.0.0.1:8084/v1');
+    setMcp(localStorage.getItem('chimere:mcp') || 'http://127.0.0.1:9095');
   }, []);
 
   const save = () => {
     localStorage.setItem('chimere:backend', backend);
+    localStorage.setItem('chimere:mcp', mcp);
     router.back();
   };
 
@@ -35,6 +38,17 @@ export default function Settings() {
               className="w-full rounded-md bg-secondary/50 border border-border px-3 py-2"
             />
             <p className="text-xs text-muted-foreground">Défaut : http://127.0.0.1:8084/v1 (ODO local)</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm text-muted-foreground">MCP bridge URL (Memory Inspector)</label>
+            <input
+              value={mcp}
+              onChange={(e) => setMcp(e.target.value)}
+              className="w-full rounded-md bg-secondary/50 border border-border px-3 py-2"
+            />
+            <p className="text-xs text-muted-foreground">
+              Défaut : http://127.0.0.1:9095 (chimere-mcp REST routes under /api/memory et /api/engram)
+            </p>
           </div>
           <button onClick={save} className="rounded-md bg-primary px-4 py-2 text-primary-foreground text-sm">Sauvegarder</button>
         </div>
